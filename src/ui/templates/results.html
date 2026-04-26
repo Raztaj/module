@@ -9,21 +9,28 @@
         body { background-color: #f8f9fa; padding: 50px; }
         .card { margin-bottom: 20px; }
         .status-1 { color: green; font-weight: bold; }
+        .status-2 { color: blue; font-weight: bold; }
         .status-3 { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Processing Results</h1>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Processing Results</h1>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">New Entry</a>
+        </div>
         <hr>
 
         {% for res in results %}
-        <div class="card">
+        <div class="card" id="group-{{ res.group_id }}">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><strong>Message:</strong> {{ res.msg_preview }}</span>
-                <span class="status-{{ res.group_status }}">
-                    {{ 'Validated' if res.group_status == 1 else 'Error/Incomplete' }}
-                </span>
+                <div>
+                    <span class="status-{{ res.group_status }} me-3" id="status-text-{{ res.group_id }}">
+                        {% if res.group_status == 1 %} Validated {% elif res.group_status == 2 %} Injected {% else %} Error/Incomplete {% endif %}
+                    </span>
+                    <button class="btn btn-sm btn-success" onclick="injectGroup({{ res.group_id }})">Inject (Module 2)</button>
+                </div>
             </div>
             <div class="card-body">
                 <table class="table table-striped">
@@ -34,16 +41,22 @@
                             <th>Phone</th>
                             <th>Relation</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for person in res.people %}
-                        <tr>
+                        <tr id="person-row-{{ person.person_id if person.person_id else 'none' }}">
                             <td>{{ person.full_name or 'N/A' }}</td>
                             <td>{{ person.id_val or 'N/A' }}</td>
                             <td>{{ person.phone or 'N/A' }}</td>
                             <td>{{ person.relation or 'N/A' }}</td>
                             <td>{{ person.status }}</td>
+                            <td>
+                                {% if person.person_id %}
+                                <button class="btn btn-sm btn-danger" onclick="deletePerson({{ person.person_id }})">Delete</button>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -51,10 +64,32 @@
             </div>
         </div>
         {% endfor %}
-
-        <div class="mt-4">
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Entry</a>
-        </div>
     </div>
+
+    <script>
+        function deletePerson(personId) {
+            if (confirm('Are you sure you want to delete this person?')) {
+                fetch('/delete/' + personId, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('person-row-' + personId).remove();
+                    }
+                });
+            }
+        }
+
+        function injectGroup(groupId) {
+            fetch('/inject/' + groupId, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    document.getElementById('status-text-' + groupId).innerText = 'Injected';
+                    document.getElementById('status-text-' + groupId).className = 'status-2 me-3';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

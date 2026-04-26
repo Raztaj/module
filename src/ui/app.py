@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import os
 import re
 from src.database.manager import DatabaseManager
@@ -41,8 +41,10 @@ def index():
 
                 if logic_officer.check_deduplication(details['id_val']):
                     details['status'] = 'Skipped (Duplicate)'
+                    details['person_id'] = None
                 else:
-                    db_manager.insert_person(details)
+                    person_id = db_manager.insert_person(details)
+                    details['person_id'] = person_id
                     if not logic_officer.validate_person(details):
                         all_valid = False
                         details['status'] = 'Validation Failed'
@@ -53,11 +55,23 @@ def index():
 
             status = 1 if all_valid and people_processed else 3
             db_manager.update_group_status(group_id, status)
-            results.append({'msg_preview': msg[:50] + '...', 'people': people_processed, 'group_status': status})
+            results.append({'group_id': group_id, 'msg_preview': msg[:50] + '...', 'people': people_processed, 'group_status': status})
 
         return render_template('results.html', results=results)
 
     return render_template('index.html')
+
+@app.route('/delete/<int:person_id>', methods=['POST'])
+def delete_person(person_id):
+    db_manager.delete_person(person_id)
+    return jsonify({"status": "success"})
+
+@app.route('/inject/<int:group_id>', methods=['POST'])
+def inject_group(group_id):
+    # This is a placeholder for Module 2 logic
+    # In the future, this will trigger the Playwright automation
+    db_manager.update_group_status(group_id, 2) # status=2: Injected
+    return jsonify({"status": "success", "message": "Module 2 (Injector) triggered for group " + str(group_id)})
 
 def start_ui():
     app.run(host='0.0.0.0', port=5000, debug=True)

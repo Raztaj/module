@@ -12,7 +12,6 @@ class DatabaseManager:
     def init_db(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # Table: family_groups
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS family_groups (
                     group_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,7 +19,6 @@ class DatabaseManager:
                     status INTEGER DEFAULT 0
                 )
             ''')
-            # Table: people
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS people (
                     person_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,17 +48,24 @@ class DatabaseManager:
             return cursor.lastrowid
 
     def insert_person(self, person_data):
-        """
-        person_data: dict containing keys matching the columns in 'people' table
-        """
-        columns = ', '.join(person_data.keys())
-        placeholders = ', '.join(['?'] * len(person_data))
+        # Filter for database keys only
+        valid_keys = ['group_id', 'is_primary', 'full_name', 'id_val', 'phone', 'dob', 'entry_date', 'social_status', 'health', 'education', 'relation']
+        filtered_data = {k: v for k, v in person_data.items() if k in valid_keys}
+
+        columns = ', '.join(filtered_data.keys())
+        placeholders = ', '.join(['?'] * len(filtered_data))
         sql = f"INSERT INTO people ({columns}) VALUES ({placeholders})"
 
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, list(person_data.values()))
+            cursor.execute(sql, list(filtered_data.values()))
             return cursor.lastrowid
+
+    def delete_person(self, person_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM people WHERE person_id = ?", (person_id,))
+            conn.commit()
 
     def update_group_status(self, group_id, status):
         with self.get_connection() as conn:
