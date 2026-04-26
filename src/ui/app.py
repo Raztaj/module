@@ -15,6 +15,39 @@ db_manager = DatabaseManager()
 extractor = Extractor()
 logic_officer = LogicOfficer(db_manager)
 
+def enrich_people_with_logic(people, group_id=None):
+    """Adds relational and validation logic to a list of people."""
+    if not people: return []
+
+    # Identify primary
+    primary_person = next((p for p in people if p.get('is_primary') or p.get('relation') == 'Primary'), people[0])
+
+    enriched = []
+    for p in people:
+        # Mandatory field check
+        is_valid = logic_officer.validate_person(p)
+
+        # Missing data check (Flagged)
+        missing_data = not all([p.get('full_name'), p.get('id_val'), p.get('phone'), p.get('dob')])
+
+        # Relational check
+        relational_valid = True
+        if not (p.get('is_primary') or p.get('relation') == 'Primary'):
+            relational_valid = logic_officer.check_relational_law(primary_person, p)
+
+        p['relational_error'] = not relational_valid
+        p['missing_data'] = missing_data
+
+        if not is_valid:
+            p['status'] = 'Validation Failed (Missing Name/ID)'
+        elif missing_data or not relational_valid:
+            p['status'] = 'Flagged (Review Required)'
+        else:
+            p['status'] = 'Saved/Ready'
+
+        enriched.append(p)
+    return enriched
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -30,45 +63,27 @@ def index():
             group_id = db_manager.insert_family_group(msg, status=0)
             blocks = split_into_people_blocks(msg)
 
-            people_processed = []
-            primary_person = None
-
+            raw_people = []
             for i, block in enumerate(blocks):
                 is_primary = (i == 0)
                 details = extractor.extract_person_details(block, is_primary=is_primary)
                 if not details['full_name'] and not details['id_val']:
                     continue
+                raw_people.append(details)
 
-                details['group_id'] = group_id
-                if is_primary:
-                    primary_person = details
+            people_processed = enrich_people_with_logic(raw_people)
 
-                if logic_officer.check_deduplication(details['id_val']):
-                    details['status'] = 'Skipped (Duplicate)'
-                    details['person_id'] = None
+            for person in people_processed:
+                person['group_id'] = group_id
+                if logic_officer.check_deduplication(person['id_val']):
+                    person['status'] = 'Skipped (Duplicate)'
+                    person['person_id'] = None
                 else:
-                    person_id = db_manager.insert_person(details)
-                    details['person_id'] = person_id
+                    person_id = db_manager.insert_person(person)
+                    person['person_id'] = person_id
 
-                    # Validation
-                    valid = logic_officer.validate_person(details)
-                    relational_valid = True
-                    if not is_primary and primary_person:
-                        relational_valid = logic_officer.check_relational_law(primary_person, details)
-
-                    details['relational_error'] = not relational_valid
-
-                    if not valid:
-                        details['status'] = 'Validation Failed'
-                    elif not relational_valid:
-                        details['status'] = 'Relational Warning'
-                    else:
-                        details['status'] = 'Saved'
-
-                people_processed.append(details)
-
-            all_valid = all(p.get('status') == 'Saved' for p in people_processed)
-            status = 1 if all_valid and people_processed else 3
+            all_ready = all(p.get('status') == 'Saved/Ready' for p in people_processed)
+            status = 1 if all_ready and people_processed else 3
             db_manager.update_group_status(group_id, status)
             results.append({'group_id': group_id, 'msg_preview': msg[:50] + '...', 'people': people_processed, 'group_status': status})
 
@@ -84,7 +99,8 @@ def dashboard():
 @app.route('/group/<int:group_id>')
 def view_group(group_id):
     people = db_manager.get_all_people_by_group(group_id)
-    return render_template('results.html', results=[{'group_id': group_id, 'msg_preview': 'Group #' + str(group_id), 'people': people, 'group_status': None}])
+    enriched_people = enrich_people_with_logic(people)
+    return render_template('results.html', results=[{'group_id': group_id, 'msg_preview': 'Group #' + str(group_id), 'people': enriched_people, 'group_status': None}])
 
 @app.route('/update/<int:person_id>', methods=['POST'])
 def update_person(person_id):
@@ -108,9 +124,13 @@ def export_excel():
     if not people:
         flash("No data to export.", "error")
         return redirect(url_for('index'))
-    df = pd.DataFrame(people)
-    cols = ['person_id', 'group_id', 'full_name', 'id_val', 'phone', 'dob', 'entry_date', 'relation', 'social_status', 'health', 'education']
+
+    enriched = enrich_people_with_logic(people)
+    df = pd.DataFrame(enriched)
+
+    cols = ['person_id', 'group_id', 'full_name', 'id_val', 'phone', 'dob', 'entry_date', 'relation', 'status']
     df = df[[c for c in cols if c in df.columns]]
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='People')

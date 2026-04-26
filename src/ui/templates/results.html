@@ -12,6 +12,7 @@
         .status-2 { color: blue; font-weight: bold; }
         .status-3 { color: red; font-weight: bold; }
         .warning-row { background-color: #fff3cd !important; }
+        .error-row { background-color: #f8d7da !important; }
     </style>
 </head>
 <body>
@@ -34,7 +35,7 @@
                     <span class="status-{{ res.group_status }} me-3" id="status-text-{{ res.group_id }}">
                         {% if res.group_status == 1 %} Validated
                         {% elif res.group_status == 2 %} Injected
-                        {% elif res.group_status == 3 %} Error/Incomplete
+                        {% elif res.group_status == 3 %} Flagged/Error
                         {% elif res.group_status == 0 %} Raw {% endif %}
                     </span>
                     <button class="btn btn-sm btn-success" onclick="injectGroup({{ res.group_id }})">Inject (Module 2)</button>
@@ -50,13 +51,14 @@
                             <th>Relation</th>
                             <th>DOB</th>
                             <th>Entry Date</th>
-                            <th>Status</th>
+                            <th>Status/Flags</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for person in res.people %}
-                        <tr id="person-row-{{ person.person_id if person.person_id else 'none' }}" class="{{ 'warning-row' if person.relational_error }}">
+                        <tr id="person-row-{{ person.person_id if person.person_id else 'none' }}"
+                            class="{{ 'error-row' if person.status.startswith('Validation') else ('warning-row' if person.relational_error or person.missing_data) }}">
                             <td><input type="text" class="form-control form-control-sm" id="name-{{ person.person_id }}" value="{{ person.full_name or '' }}"></td>
                             <td><input type="text" class="form-control form-control-sm" id="id-{{ person.person_id }}" value="{{ person.id_val or '' }}"></td>
                             <td><input type="text" class="form-control form-control-sm" id="phone-{{ person.person_id }}" value="{{ person.phone or '' }}"></td>
@@ -64,10 +66,11 @@
                             <td><input type="text" class="form-control form-control-sm" id="dob-{{ person.person_id }}" value="{{ person.dob or '' }}"></td>
                             <td><input type="text" class="form-control form-control-sm" id="entry-{{ person.person_id }}" value="{{ person.entry_date or '' }}"></td>
                             <td>
-                                <span class="badge {{ 'bg-success' if person.status == 'Saved' else 'bg-warning' }}">
+                                <span class="badge {{ 'bg-success' if person.status == 'Saved/Ready' else 'bg-warning' if 'Flagged' in person.status else 'bg-danger' }}">
                                     {{ person.status }}
                                 </span>
-                                {% if person.relational_error %} <br><small class="text-danger">Relational Law mismatch</small> {% endif %}
+                                {% if person.relational_error %} <br><small class="text-danger">Relational mismatch</small> {% endif %}
+                                {% if person.missing_data %} <br><small class="text-muted">Missing some info</small> {% endif %}
                             </td>
                             <td>
                                 <div class="btn-group">
@@ -102,7 +105,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert('Updated successfully');
+                    alert('Updated successfully. Refresh to see updated status flags.');
+                    location.reload();
                 }
             });
         }

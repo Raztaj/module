@@ -26,33 +26,41 @@ class Extractor:
         return None
 
     def extract_name(self, text):
-        # Clean text from timestamps and leading markers
+        # Clean text from timestamps
         text = re.sub(r'^\[\d{1,2}:\d{2}\s*[APM]{2},\s*\d{1,2}/\d{1,2}/\d{4}\]\s*\w+:\s*', '', text)
         text = text.lstrip('🔻*•- \n')
 
+        # Strip common relation suffixes from EVERY line for extraction
+        name_text = re.sub(r'\(رب الاسره\)|\(ابنه\)|\(ابن\)|\(زوجه\)|\(والده\)|\(والد\)', '', text)
+
         name_labels = ['الاسم رباعي', 'الاسم', 'المستفيد الرئيسي', 'الوالدة', 'الابنة', 'ابن', 'ابنة']
 
-        # Priority 1: Labels
         for label in name_labels:
-            match = re.search(rf'{label}\s*[:/]?\s*([^\n\d🔻\*]+)', text)
+            match = re.search(rf'{label}\s*[:/]?\s*([^\n\d🔻\*\(]+)', name_text)
             if match:
                 name = match.group(1).strip().strip('-').strip('*').strip()
                 if len(name.split()) >= 2:
-                    # Ensure it's not just a status or other field
                     if not any(kw in name for kw in ['متزوج', 'مطلق', 'اعزب', 'طالب', 'جامعي']):
                         return name
 
-        # Priority 2: First line if it looks like a name
-        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        lines = [l.strip() for l in name_text.split('\n') if l.strip()]
         for line in lines[:2]:
-            clean_line = re.sub(r'^[🔻\*•\-\d\\.)\s]+', '', line).strip()
+            clean_line = re.sub(r'^[🔻\*•\-\d\\.)\s/:]+', '', line).strip()
             if not re.search(r'\d{5,}', clean_line) and len(clean_line.split()) >= 2:
                 if not any(label in clean_line for label in name_labels):
-                    # Negative keywords
                     if not any(kw in clean_line for kw in ['متزوج', 'مطلق', 'اعزب', 'طالب', 'جامعي', 'ضغط', 'سكري']):
                         return clean_line
 
         return None
+
+    def extract_relation(self, text):
+        if '(رب الاسره)' in text: return 'Primary'
+        if '(ابنه)' in text: return 'ابنة'
+        if '(ابن)' in text: return 'ابن'
+        if '(زوجه)' in text: return 'زوجة'
+        if '(والده)' in text: return 'والدة'
+
+        return self.extract_label_value(text, ['صلة القرابة', 'صلة القرابة برب الاسرة', 'صلة القربى'])
 
     def extract_person_details(self, block, is_primary=False):
         normalized_block = full_normalize(block)
@@ -64,20 +72,18 @@ class Extractor:
             'phone': self.extract_phone(normalized_block),
             'dob': None,
             'entry_date': None,
-            'social_status': self.extract_label_value(normalized_block, ['الحالة الاجتماعية']),
-            'health': self.extract_label_value(normalized_block, ['الحالة الصحية']),
-            'education': self.extract_label_value(normalized_block, ['المرحلة التعليمية', 'التعليم', 'المراحل التعليمية']),
-            'relation': self.extract_label_value(normalized_block, ['صلة القرابة', 'صلة القرابة برب الاسرة'])
+            'social_status': self.extract_label_value(normalized_block, ['الحالة الاجتماعية', 'الحاله الاجتماعيه', 'الحاله الاجتماعه']),
+            'health': self.extract_label_value(normalized_block, ['الحالة الصحية', 'الحاله الصحيه', 'الحالة الصحيه']),
+            'education': self.extract_label_value(normalized_block, ['المرحلة التعليمية', 'المرحله التعليميه', 'التعليم', 'المراحل التعليمية']),
+            'relation': self.extract_relation(normalized_block)
         }
 
-        # Date extraction
-        dob_match = re.search(r'تاريخ الميلاد\s*[:/]?\s*\n?\s*([^\n]+)', normalized_block)
+        dob_match = re.search(r'(?:تاريخ الميلاد|تاريخ ميلاد)\s*[:/]?\s*\n?\s*([^\n]+)', normalized_block)
         if dob_match:
             details['dob'] = parse_date(dob_match.group(1).strip())
         else:
             dates = re.findall(r'(\d{1,2}[/.]\d{1,2}[/.]\d{4})', normalized_block)
-            if dates:
-                details['dob'] = parse_date(dates[0])
+            if dates: details['dob'] = parse_date(dates[0])
 
         entry_match = re.search(r'(?:تاريخ دخول مصر|تاريخ الدخول|تاريخ الدخول لمصر)\s*[:/]?\s*\n?\s*([^\n]+)', normalized_block)
         if entry_match:
@@ -90,7 +96,7 @@ class Extractor:
 
     def extract_label_value(self, text, labels):
         for label in labels:
-            match = re.search(rf'{label}\s*[:/]?\s*([^\n\*🔻-]+)', text)
+            match = re.search(rf'{label}\s*[:/]?\s*([^\n\*🔻\(-]+)', text)
             if match:
                 return match.group(1).strip()
         return None

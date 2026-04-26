@@ -10,47 +10,52 @@
         .status-1 { color: green; }
         .status-2 { color: blue; }
         .status-3 { color: red; }
+        .table-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container-fluid px-5">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Historical Dashboard</h1>
             <div>
-                <a href="{{ url_for('export_excel') }}" class="btn btn-outline-success me-2">Export All</a>
+                <a href="{{ url_for('export_excel') }}" class="btn btn-outline-success me-2">Export All to Excel</a>
                 <a href="{{ url_for('index') }}" class="btn btn-primary">New Entry</a>
             </div>
         </div>
         <hr>
 
-        <table class="table table-hover bg-white shadow-sm rounded">
-            <thead class="table-light">
-                <tr>
-                    <th>Group ID</th>
-                    <th>Message Preview</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for group in groups %}
-                <tr>
-                    <td>{{ group.group_id }}</td>
-                    <td class="text-truncate" style="max-width: 400px;">{{ group.raw_text[:100] }}...</td>
-                    <td class="status-{{ group.status }} font-weight-bold">
-                        {% if group.status == 0 %} Raw
-                        {% elif group.status == 1 %} Validated
-                        {% elif group.status == 2 %} Injected
-                        {% elif group.status == 3 %} Error
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{{ url_for('view_group', group_id=group.group_id) }}" class="btn btn-sm btn-info text-white">View/Edit</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Message Preview</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr>
+                        <td>{{ group.group_id }}</td>
+                        <td class="text-truncate" style="max-width: 500px;">{{ group.raw_text[:150] }}...</td>
+                        <td class="status-{{ group.status }} fw-bold">
+                            {% if group.status == 0 %} Raw
+                            {% elif group.status == 1 %} Validated
+                            {% elif group.status == 2 %} Injected
+                            {% elif group.status == 3 %} Error
+                            {% endif %}
+                        </td>
+                        <td>N/A</td>
+                        <td>
+                            <a href="{{ url_for('view_group', group_id=group.group_id) }}" class="btn btn-sm btn-info text-white">View/Edit</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </body>
 </html>
