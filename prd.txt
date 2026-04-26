@@ -1,0 +1,147 @@
+This PRD is designed to be a "Master Blueprint" for high-level AI execution. It
+covers every technical detail required to build the Family Data Orchestrator
+(FDO), from data parsing logic to web automation.
+
+PRD: Family Data Orchestrator (FDO)
+
+Code Name: Project "Fast-Entry"
+Framework: Python 3.11+ | Playwright | SQLite | Pandas
+
+1. System Architecture Overview
+
+The system is divided into three distinct layers to ensure that a failure in one
+(e.g., a website change) does not destroy the data collected in the other.
+
+1.  Module 1: The Heuristic Parser (Ingestion Layer)
+2.  The Persistence Layer (SQLite Database)
+3.  Module 2: The Data Injector (Automation Layer)
+
+2. Comprehensive Functional Requirements
+
+2.1 Module 1: The Heuristic Parser (Arabic Text Processing)
+
+Objective: Transform unstructured Arabic messages into clean JSON/SQL.
+
+  - FR1.1: Multi-Step Normalization
+      - Digit Conversion: Convert Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) to
+        Western (0123456789).
+      - Text Standardization: Strip "Tashkeel" (short vowels). Normalize
+        "Hamzas" (إ، أ، آ \rightarrow ا) and "Ya" (ى \rightarrow ي).
+  - FR1.2: Segmentation Engine (The Splitter)
+      - The system must split a single message into "Person Blocks" using a
+        priority list of delimiters:
+        1.  Keywords: الاسم, رقم الهوية, لكل فرد من الاسرة.
+        2.  Symbols: 🔻, *, •, -.
+  - FR1.3: Positional & Regex Extraction
+      - Regex Passport: [Pp]\d{7,9}
+      - Regex UNHCR ID: 555-\d{2,4}-\d{7,9}
+      - Regex Phone: (\+20|01|249)\d{8,11}
+      - Positional Logic: If no labels exist, assume Line 1 = Name, Line 2 =
+        ID/Passport.
+  - FR1.4: Date Intelligence
+      - Map Arabic months (يناير, فبراير, etc.) to numbers (01, 02).
+      - Handle formats: DD/MM/YYYY, DD.MM.YYYY, and DD Month YYYY.
+
+2.2 The Persistence Layer (Database Schema)
+
+Objective: Act as the "Source of Truth" and State Machine.
+
+  - Table: family_groups
+      - group_id (Primary Key)
+      - raw_text (The original message for auditing)
+      - status (0: Raw, 1: Validated, 2: Injected, 3: Error)
+  - Table: people
+      - person_id (PK)
+      - group_id (Foreign Key)
+      - is_primary (Boolean: Is this the first person/head?)
+      - full_name, id_val, phone, dob, entry_date, social_status, health,
+        education, relation.
+
+2.3 Module 2: The Data Injector (Web Automation)
+
+Objective: Log in and enter data reliably.
+
+  - FR2.1: Playwright Engine
+      - Use sync_playwright for linear script execution.
+      - Implement headless=False for monitoring and headless=True for speed.
+  - FR2.2: Config-Driven Locators
+      - All web IDs (e.g., input#firstName) must be in a config.yaml.
+  - FR2.3: Dynamic Wait States
+      - Do not use time.sleep(). Use page.wait_for_selector() and
+        page.wait_for_load_state('networkidle').
+  - FR2.4: Sub-Form Looping
+      - If family_count > 1, the bot must locate the "Add Member" button and
+        repeat the entry process for every linked ID in the DB.
+
+3. Logical Officer’s "Business Rules"
+
+1.  Deduplication Law: If a Passport_Number already exists in the people table,
+    the parser must flag it but not create a new entry.
+2.  Relational Law: If the relation field contains "ابن" or "ابنة", the system
+    must automatically check if their 3rd/4th name matches the Primary person's
+    name.
+3.  Mandatory Field Law: A record cannot move to status=1 (Validated) if
+    full_name or id_val is missing.
+
+4. The Tester’s Quality Assurance (QA) Suite
+
+4.1 Edge Case Scenarios
+
+  - The "Date on Next Line" Test: Ensure the parser captures the date even if
+    there is a line break between the label and the value.
+  - The "Multiple Phones" Test: If a user provides an Egyptian and a Sudanese
+    number, the bot should prioritize the Egyptian number for the web system but
+    save both in the DB.
+  - The "Slow Server" Test: Simulate a 10-second lag on the web system; verify
+    that Playwright waits for the "Success" message without crashing.
+
+4.2 Error Handling Requirements
+
+  - Screen-Capture on Failure: Module 2 must take a screenshot if it cannot find
+    a button and save it to /errors/ with the person_id as the filename.
+
+5. Non-Functional Requirements (NFR)
+
+  - Security: Use .env for system credentials. Encrypt the SQLite file if stored
+    on a shared drive.
+  - Performance: Module 1 must process 100 messages in under 10 seconds.
+  - Usability: Provide a simple "Summary Report" after each run:
+      - Processed: 10 | Successful: 8 | Failed: 2 (Reason: Missing ID).
+
+6. Implementation Roadmap
+
+Phase 1: The Foundation
+
+  - Setup SQLite tables.
+  - Create the config.yaml for system settings.
+
+Phase 2: Module 1 (The Parser)
+
+  - Build the Regex library for IDs and Phones.
+  - Build the Arabic Date-to-ISO translator.
+  - Test with the 4 example messages provided.
+
+Phase 3: Module 2 (The Injector)
+
+  - Build the Playwright login flow.
+  - Build the "Primary" data entry flow.
+  - Build the "Member" loop entry flow.
+
+Phase 4: Final Integration
+
+  - Create a "Main" script that runs Module 1, then triggers Module 2.
+  - Add Excel Export functionality for records with status=2.
+
+7. Data Dictionary (Internal Contract)
+
+| Field Name  | Data Type | Regex / Validation                          |
+| :---------- | :-------- | :------------------------------------------ |
+| `full_name` | String    | Arabic characters only, min 3 words         |
+| `id_val`    | String    | `^555-\d+` OR `^[Pp]\d+`                    |
+| `phone`     | String    | \`^(+?201                                   |
+| `dob`       | Date      | `YYYY-MM-DD`                                |
+| `relation`  | Enum      | `[Primary, Spouse, Child, Parent, Sibling]` |
+
+This PRD is now ready to be used as the prompt for coding the modules. Next
+Step: Would you like to generate the code for the Module 1 Parser based on these
+rules?
