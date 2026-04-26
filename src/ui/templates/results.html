@@ -11,13 +11,15 @@
         .status-1 { color: green; font-weight: bold; }
         .status-2 { color: blue; font-weight: bold; }
         .status-3 { color: red; font-weight: bold; }
+        .warning-row { background-color: #fff3cd !important; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>Processing Results</h1>
+            <h1>Processing Results / View Group</h1>
             <div>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-info me-2">Dashboard</a>
                 <a href="{{ url_for('export_excel') }}" class="btn btn-outline-success me-2">Export to Excel</a>
                 <a href="{{ url_for('index') }}" class="btn btn-secondary">New Entry</a>
             </div>
@@ -30,35 +32,48 @@
                 <span><strong>Message:</strong> {{ res.msg_preview }}</span>
                 <div>
                     <span class="status-{{ res.group_status }} me-3" id="status-text-{{ res.group_id }}">
-                        {% if res.group_status == 1 %} Validated {% elif res.group_status == 2 %} Injected {% else %} Error/Incomplete {% endif %}
+                        {% if res.group_status == 1 %} Validated
+                        {% elif res.group_status == 2 %} Injected
+                        {% elif res.group_status == 3 %} Error/Incomplete
+                        {% elif res.group_status == 0 %} Raw {% endif %}
                     </span>
                     <button class="btn btn-sm btn-success" onclick="injectGroup({{ res.group_id }})">Inject (Module 2)</button>
                 </div>
             </div>
             <div class="card-body">
-                <table class="table table-striped">
-                    <thead>
+                <table class="table table-bordered">
+                    <thead class="table-light">
                         <tr>
                             <th>Name</th>
                             <th>ID</th>
                             <th>Phone</th>
                             <th>Relation</th>
+                            <th>DOB</th>
+                            <th>Entry Date</th>
                             <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for person in res.people %}
-                        <tr id="person-row-{{ person.person_id if person.person_id else 'none' }}">
-                            <td>{{ person.full_name or 'N/A' }}</td>
-                            <td>{{ person.id_val or 'N/A' }}</td>
-                            <td>{{ person.phone or 'N/A' }}</td>
-                            <td>{{ person.relation or 'N/A' }}</td>
-                            <td>{{ person.status }}</td>
+                        <tr id="person-row-{{ person.person_id if person.person_id else 'none' }}" class="{{ 'warning-row' if person.relational_error }}">
+                            <td><input type="text" class="form-control form-control-sm" id="name-{{ person.person_id }}" value="{{ person.full_name or '' }}"></td>
+                            <td><input type="text" class="form-control form-control-sm" id="id-{{ person.person_id }}" value="{{ person.id_val or '' }}"></td>
+                            <td><input type="text" class="form-control form-control-sm" id="phone-{{ person.person_id }}" value="{{ person.phone or '' }}"></td>
+                            <td><input type="text" class="form-control form-control-sm" id="relation-{{ person.person_id }}" value="{{ person.relation or '' }}"></td>
+                            <td><input type="text" class="form-control form-control-sm" id="dob-{{ person.person_id }}" value="{{ person.dob or '' }}"></td>
+                            <td><input type="text" class="form-control form-control-sm" id="entry-{{ person.person_id }}" value="{{ person.entry_date or '' }}"></td>
                             <td>
-                                {% if person.person_id %}
-                                <button class="btn btn-sm btn-danger" onclick="deletePerson({{ person.person_id }})">Delete</button>
-                                {% endif %}
+                                <span class="badge {{ 'bg-success' if person.status == 'Saved' else 'bg-warning' }}">
+                                    {{ person.status }}
+                                </span>
+                                {% if person.relational_error %} <br><small class="text-danger">Relational Law mismatch</small> {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-primary" onclick="updatePerson({{ person.person_id }})">Save</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deletePerson({{ person.person_id }})">Del</button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -70,14 +85,35 @@
     </div>
 
     <script>
+        function updatePerson(personId) {
+            const data = {
+                full_name: document.getElementById('name-' + personId).value,
+                id_val: document.getElementById('id-' + personId).value,
+                phone: document.getElementById('phone-' + personId).value,
+                relation: document.getElementById('relation-' + personId).value,
+                dob: document.getElementById('dob-' + personId).value,
+                entry_date: document.getElementById('entry-' + personId).value
+            };
+            fetch('/update/' + personId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Updated successfully');
+                }
+            });
+        }
+
         function deletePerson(personId) {
             if (confirm('Are you sure you want to delete this person?')) {
                 fetch('/delete/' + personId, { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        const row = document.getElementById('person-row-' + personId);
-                        if (row) row.remove();
+                        document.getElementById('person-row-' + personId).remove();
                     }
                 });
             }

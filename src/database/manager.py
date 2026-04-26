@@ -60,6 +60,21 @@ class DatabaseManager:
             cursor.execute(sql, list(filtered_data.values()))
             return cursor.lastrowid
 
+    def update_person(self, person_id, person_data):
+        valid_keys = ['full_name', 'id_val', 'phone', 'dob', 'entry_date', 'social_status', 'health', 'education', 'relation']
+        filtered_data = {k: v for k, v in person_data.items() if k in valid_keys}
+
+        set_clause = ', '.join([f"{k} = ?" for k in filtered_data.keys()])
+        values = list(filtered_data.values())
+        values.append(person_id)
+
+        sql = f"UPDATE people SET {set_clause} WHERE person_id = ?"
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, values)
+            conn.commit()
+
     def delete_person(self, person_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -74,6 +89,13 @@ class DatabaseManager:
                 (status, group_id)
             )
 
+    def get_all_groups(self):
+        with self.get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM family_groups ORDER BY group_id DESC")
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_all_people_by_group(self, group_id):
         with self.get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -85,7 +107,6 @@ class DatabaseManager:
         with self.get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            # Joining with family_groups to get status if needed, or just all people
             cursor.execute("SELECT * FROM people")
             return [dict(row) for row in cursor.fetchall()]
 

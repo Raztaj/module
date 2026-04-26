@@ -5,8 +5,6 @@ class LogicOfficer:
     def validate_person(self, person_data):
         """
         Validates if person meets Mandatory Field Law (status=1).
-        - full_name must exist.
-        - id_val must exist.
         """
         if person_data.get('full_name') and person_data.get('id_val'):
             return True
@@ -26,20 +24,20 @@ class LogicOfficer:
         """
         relation = member.get('relation', '')
         if not relation:
-            return True # No relation to check
+            return True
 
-        if 'ابن' in relation or 'ابنة' in relation or 'Child' in relation:
+        if any(kw in relation for kw in ['ابن', 'ابنة', 'Child']):
             primary_name = primary_person.get('full_name', '')
             member_name = member.get('full_name', '')
 
             if primary_name and member_name:
-                # Basic check: primary's first name should be in member's full name
-                # (usually 2nd or 3rd name)
-                primary_first_name = primary_name.split()[0]
-                if primary_first_name in member_name:
-                    return True
-                # More strict PRD rule: 3rd/4th name match
                 primary_parts = primary_name.split()
                 member_parts = member_name.split()
-                # This is heuristic-heavy, but let's just log or flag if suspicious
+
+                # Rule: Primary's first name should be child's 2nd, 3rd, or 4th name
+                primary_first = primary_parts[0]
+                # Check child's names from index 1 onwards
+                if primary_first in member_parts[1:]:
+                    return True
+                return False
         return True
