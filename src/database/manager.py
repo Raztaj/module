@@ -48,7 +48,6 @@ class DatabaseManager:
             return cursor.lastrowid
 
     def insert_person(self, person_data):
-        # Filter for database keys only
         valid_keys = ['group_id', 'is_primary', 'full_name', 'id_val', 'phone', 'dob', 'entry_date', 'social_status', 'health', 'education', 'relation']
         filtered_data = {k: v for k, v in person_data.items() if k in valid_keys}
 
@@ -80,6 +79,14 @@ class DatabaseManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM people WHERE group_id = ?", (group_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_all_people_for_export(self):
+        with self.get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            # Joining with family_groups to get status if needed, or just all people
+            cursor.execute("SELECT * FROM people")
             return [dict(row) for row in cursor.fetchall()]
 
     def check_id_exists(self, id_val):

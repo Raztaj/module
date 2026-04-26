@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 import os
 import re
+import pandas as pd
+import io
 from src.database.manager import DatabaseManager
 from src.parser.splitter import split_into_people_blocks
 from src.parser.extractor import Extractor
@@ -68,10 +70,32 @@ def delete_person(person_id):
 
 @app.route('/inject/<int:group_id>', methods=['POST'])
 def inject_group(group_id):
-    # This is a placeholder for Module 2 logic
-    # In the future, this will trigger the Playwright automation
-    db_manager.update_group_status(group_id, 2) # status=2: Injected
+    db_manager.update_group_status(group_id, 2)
     return jsonify({"status": "success", "message": "Module 2 (Injector) triggered for group " + str(group_id)})
+
+@app.route('/export')
+def export_excel():
+    people = db_manager.get_all_people_for_export()
+    if not people:
+        flash("No data to export.", "error")
+        return redirect(url_for('index'))
+
+    df = pd.DataFrame(people)
+
+    # Reorder or select columns for a cleaner Excel
+    cols = ['person_id', 'group_id', 'full_name', 'id_val', 'phone', 'dob', 'entry_date', 'relation', 'social_status', 'health', 'education']
+    df = df[[c for c in cols if c in df.columns]]
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='People')
+
+    output.seek(0)
+
+    return send_file(output,
+                     download_name="fdo_export.xlsx",
+                     as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 def start_ui():
     app.run(host='0.0.0.0', port=5000, debug=True)

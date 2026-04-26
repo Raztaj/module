@@ -17,7 +17,10 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Processing Results</h1>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">New Entry</a>
+            <div>
+                <a href="{{ url_for('export_excel') }}" class="btn btn-outline-success me-2">Export to Excel</a>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">New Entry</a>
+            </div>
         </div>
         <hr>
 
@@ -73,7 +76,8 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        document.getElementById('person-row-' + personId).remove();
+                        const row = document.getElementById('person-row-' + personId);
+                        if (row) row.remove();
                     }
                 });
             }
@@ -85,8 +89,11 @@
             .then(data => {
                 if (data.status === 'success') {
                     alert(data.message);
-                    document.getElementById('status-text-' + groupId).innerText = 'Injected';
-                    document.getElementById('status-text-' + groupId).className = 'status-2 me-3';
+                    const statusText = document.getElementById('status-text-' + groupId);
+                    if (statusText) {
+                        statusText.innerText = 'Injected';
+                        statusText.className = 'status-2 me-3';
+                    }
                 }
             });
         }
