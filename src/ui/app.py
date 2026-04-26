@@ -16,14 +16,22 @@ extractor = Extractor()
 logic_officer = LogicOfficer(db_manager)
 
 def enrich_people_with_logic(people, group_id=None):
-    """Adds relational and validation logic to a list of people."""
+    """Adds relational and validation logic to a list of people, propagating family-wide fields."""
     if not people: return []
 
-    # Identify primary
+    # Identify primary/head of household
     primary_person = next((p for p in people if p.get('is_primary') or p.get('relation') == 'Primary'), people[0])
+    main_phone = primary_person.get('phone')
+    main_entry_date = primary_person.get('entry_date')
 
     enriched = []
     for p in people:
+        # Propagate family-wide data if missing
+        if not p.get('phone') and main_phone:
+            p['phone'] = main_phone
+        if not p.get('entry_date') and main_entry_date:
+            p['entry_date'] = main_entry_date
+
         # Mandatory field check
         is_valid = logic_officer.validate_person(p)
 
@@ -106,6 +114,18 @@ def view_group(group_id):
 def update_person(person_id):
     data = request.json
     db_manager.update_person(person_id, data)
+    return jsonify({"status": "success"})
+
+@app.route('/update_group/<int:group_id>', methods=['POST'])
+def update_group_bulk(group_id):
+    data = request.json # expected keys: phone, entry_date
+    people = db_manager.get_all_people_by_group(group_id)
+    for p in people:
+        update_data = {}
+        if data.get('phone'): update_data['phone'] = data['phone']
+        if data.get('entry_date'): update_data['entry_date'] = data['entry_date']
+        if update_data:
+            db_manager.update_person(p['person_id'], update_data)
     return jsonify({"status": "success"})
 
 @app.route('/delete/<int:person_id>', methods=['POST'])

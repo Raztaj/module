@@ -13,6 +13,7 @@
         .status-3 { color: red; font-weight: bold; }
         .warning-row { background-color: #fff3cd !important; }
         .error-row { background-color: #f8d7da !important; }
+        .bulk-edit-bar { background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -42,6 +43,14 @@
                 </div>
             </div>
             <div class="card-body">
+                <!-- Bulk Edit Bar -->
+                <div class="bulk-edit-bar d-flex align-items-center gap-3">
+                    <span class="fw-bold">Group Bulk Edit:</span>
+                    <input type="text" class="form-control form-control-sm w-auto" id="bulk-phone-{{ res.group_id }}" placeholder="Set Family Phone">
+                    <input type="text" class="form-control form-control-sm w-auto" id="bulk-entry-{{ res.group_id }}" placeholder="Set Family Entry Date">
+                    <button class="btn btn-sm btn-dark" onclick="bulkUpdate({{ res.group_id }})">Apply to All</button>
+                </div>
+
                 <table class="table table-bordered">
                     <thead class="table-light">
                         <tr>
@@ -105,7 +114,26 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert('Updated successfully. Refresh to see updated status flags.');
+                    alert('Updated successfully');
+                    location.reload();
+                }
+            });
+        }
+
+        function bulkUpdate(groupId) {
+            const data = {
+                phone: document.getElementById('bulk-phone-' + groupId).value,
+                entry_date: document.getElementById('bulk-entry-' + groupId).value
+            };
+            fetch('/update_group/' + groupId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Family updated successfully');
                     location.reload();
                 }
             });

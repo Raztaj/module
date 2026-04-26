@@ -7,10 +7,12 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body { background-color: #f8f9fa; padding: 50px; }
-        .status-1 { color: green; }
-        .status-2 { color: blue; }
-        .status-3 { color: red; }
+        .status-0 { color: #6c757d; }
+        .status-1 { color: #198754; }
+        .status-2 { color: #0d6efd; }
+        .status-3 { color: #dc3545; }
         .table-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .flag-pill { font-size: 0.8rem; background: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 10px; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
@@ -31,7 +33,7 @@
                         <th>ID</th>
                         <th>Message Preview</th>
                         <th>Status</th>
-                        <th>Created</th>
+                        <th>Attention</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -40,14 +42,18 @@
                     <tr>
                         <td>{{ group.group_id }}</td>
                         <td class="text-truncate" style="max-width: 500px;">{{ group.raw_text[:150] }}...</td>
-                        <td class="status-{{ group.status }} fw-bold">
+                        <td class="fw-bold status-{{ group.status }}">
                             {% if group.status == 0 %} Raw
                             {% elif group.status == 1 %} Validated
                             {% elif group.status == 2 %} Injected
-                            {% elif group.status == 3 %} Error
+                            {% elif group.status == 3 %} Flagged/Error
                             {% endif %}
                         </td>
-                        <td>N/A</td>
+                        <td>
+                            {% if group.status == 3 %}
+                            <span class="flag-pill">Needs Review</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <a href="{{ url_for('view_group', group_id=group.group_id) }}" class="btn btn-sm btn-info text-white">View/Edit</a>
                         </td>
