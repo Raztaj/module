@@ -1,7 +1,7 @@
 import re
 
 def parse_date(date_str):
-    """
+    r"""
     Parses various Arabic and Western date formats into ISO YYYY-MM-DD.
     Formats handled:
     - DD/MM/YYYY
@@ -36,7 +36,6 @@ def parse_date(date_str):
     # Try DD Month Name YYYY
     for month_name, month_num in arabic_months.items():
         if month_name in date_str:
-            # Match 23يوليو 2023 or 23 يوليو 2023
             match = re.search(rf'(\d{{1,2}})\s*{month_name}\s*(\d{{4}})', date_str)
             if match:
                 d, y = match.groups()
